@@ -6,17 +6,13 @@
 
 using System;
 
-namespace VBFTool
+namespace VBFTool.VirtuosBigFile
 {
-  public class VirtuosBigFileException : Exception
-  {
-    public VirtuosBigFileException(string msg)
-      : base(msg)
+    public class VirtuosBigFileException : Exception
     {
+        public VirtuosBigFileException(string msg)
+            : base(msg)
+        {
+        }
     }
-
-    public VirtuosBigFileException()
-    {
-    }
-  }
 }

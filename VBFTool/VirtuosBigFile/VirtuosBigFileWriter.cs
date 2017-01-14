@@ -5,41 +5,41 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace VBFTool
+namespace VBFTool.VirtuosBigFile
 {
     public class VirtuosBigFileWriter
     {
-        private static readonly MD5CryptoServiceProvider md5 = new MD5CryptoServiceProvider();
+        private static readonly MD5 Md5 = MD5.Create();
 
-        public void BuildVBF(string inputDirectory, string outputFile)
+        public void BuildVbf(string inputDirectory, string outputFile)
         {
-            if (!Directory.Exists(inputDirectory)) return;
+            if (!Directory.Exists(inputDirectory))
+                return;
 
             Console.WriteLine("Searching for files...");
 
-            var dirFiles = Directory.EnumerateFiles(inputDirectory, "*.*", SearchOption.AllDirectories);
-            var vbfFiles = dirFiles.ToList();
+            var vbfFiles = Directory.EnumerateFiles(inputDirectory, "*.*", SearchOption.AllDirectories).ToArray();
 
-            Console.WriteLine($"Found {vbfFiles.Count} files.\n");
+            Console.WriteLine($"Found {vbfFiles.Length} files.\n");
 
-            var fileNameHashes = new byte[vbfFiles.Count][];
-            var fileOriginalSizes = new ulong[vbfFiles.Count];
-            var fileNameOffset = new ulong[vbfFiles.Count];
-            var fileStartOffsets = new ulong[vbfFiles.Count];
-            var fileBlockListStarts = new uint[vbfFiles.Count];
+            var fileNameHashes = new byte[vbfFiles.Length][];
+            var fileOriginalSizes = new ulong[vbfFiles.Length];
+            var fileNameOffset = new ulong[vbfFiles.Length];
+            var fileStartOffsets = new ulong[vbfFiles.Length];
+            var fileBlockListStarts = new uint[vbfFiles.Length];
 
             Console.Write("Generating file info tables... ");
 
             var stringTableStream = new MemoryStream();
             var fileProgress = 0;
-            for (var i = 0; i < vbfFiles.Count; i++)
+            for (var i = 0; i < vbfFiles.Length; i++)
             {
                 // Convert file name to byte array
                 var fixedName = FixFileName(inputDirectory, vbfFiles[i].ToLower());
                 var nameBytes = Encoding.UTF8.GetBytes(fixedName);
 
                 // Generate hash
-                var nameHash = md5.ComputeHash(nameBytes);
+                var nameHash = Md5.ComputeHash(nameBytes);
                 fileNameHashes[i] = nameHash;
 
                 // Get filename table offset
@@ -52,7 +52,7 @@ namespace VBFTool
                 fileOriginalSizes[i] = (ulong) fileInfo.Length;
 
                 // Update console display
-                var percent = (int) ((float) i/vbfFiles.Count*100);
+                var percent = (int) ((float) i / vbfFiles.Length * 100);
                 if (fileProgress != percent)
                 {
                     fileProgress = percent;
@@ -61,7 +61,7 @@ namespace VBFTool
                 }
             }
 
-            Console.Write('\n');
+            Console.WriteLine();
 
             var stringTable = stringTableStream.ToArray();
             stringTableStream.Dispose();
@@ -69,22 +69,19 @@ namespace VBFTool
             using (var vbfStream = new FileStream(outputFile, FileMode.Create))
             using (var vbfWriter = new BinaryWriter(vbfStream))
             {
-                vbfWriter.Write(1264144979); // VBF File Header
+                vbfWriter.Write(0x4B595253); // VBF File Header
                 vbfWriter.Write((uint) 0); // Header size
-                vbfWriter.Write((ulong) vbfFiles.Count); // Total files in archive
+                vbfWriter.Write((ulong) vbfFiles.Length); // Total files in archive
 
                 // Write filename hashes
                 foreach (var nameHash in fileNameHashes)
-                {
                     vbfWriter.Write(nameHash);
-                }
 
                 // Current location is where the block info list will be written later
                 var posBlockInfo = vbfWriter.BaseStream.Position;
 
                 // Seek to location of filename table and write it
-                vbfWriter.Seek(32*vbfFiles.Count, SeekOrigin.Current);
-
+                vbfWriter.Seek(32 * vbfFiles.Length, SeekOrigin.Current);
                 vbfWriter.Write((uint) stringTable.Length + 4);
                 vbfWriter.Write(stringTable);
 
@@ -93,14 +90,14 @@ namespace VBFTool
                 uint blockCount = 0;
                 foreach (var originalSize in fileOriginalSizes)
                 {
-                    blockCount += (uint) (originalSize/65536UL);
-                    if ((long) (originalSize%65536UL) != 0L)
+                    blockCount += (uint) (originalSize / 0x10000);
+                    if ((long) (originalSize % 0x10000) != 0L)
                         ++blockCount;
                 }
 
                 var blockSizes = new ushort[blockCount];
                 var blockSizeTablePosition = vbfWriter.BaseStream.Position;
-                var vbfHeaderLength = blockSizeTablePosition + 2*blockCount;
+                var vbfHeaderLength = blockSizeTablePosition + 2 * blockCount;
 
                 // Seek to beginning of data segment
                 vbfWriter.Seek((int) vbfHeaderLength, SeekOrigin.Begin);
@@ -108,12 +105,12 @@ namespace VBFTool
                 // Begin compressing files
                 var currentBlock = 0;
                 var progress = 0;
-                for (var fileIndex = 0; fileIndex < vbfFiles.Count; fileIndex++)
+                for (var fileIndex = 0; fileIndex < vbfFiles.Length; fileIndex++)
                 {
                     var sourceFileStream = new FileStream(vbfFiles[fileIndex], FileMode.Open);
 
-                    var fileBlocks = sourceFileStream.Length/65536;
-                    var fileMod = sourceFileStream.Length%65536;
+                    var fileBlocks = sourceFileStream.Length / 0x10000;
+                    var fileMod = sourceFileStream.Length % 0x10000;
 
                     if (fileMod != 0)
                         fileBlocks++;
@@ -124,10 +121,9 @@ namespace VBFTool
                     for (var blockIndex = 0; blockIndex < fileBlocks; blockIndex++)
                     {
                         var finalBlock = blockIndex == fileBlocks - 1;
-                        var sourceBufferSize = 65536L;
-
-                        if (finalBlock)
-                            sourceBufferSize = sourceFileStream.Length - sourceFileStream.Position;
+                        var sourceBufferSize = finalBlock
+                            ? sourceFileStream.Length - sourceFileStream.Position
+                            : 0x10000;
 
                         // read block from source file
                         var sourceBuffer = new byte[sourceBufferSize];
@@ -137,20 +133,20 @@ namespace VBFTool
                         using (var deflatedMemoryStream = new MemoryStream())
                         {
                             if (!finalBlock)
-                            {
-                                // Deflate block into memory stream
-                                using (var deflateStream = new DeflateStream(deflatedMemoryStream, CompressionMode.Compress))
+                                using (var deflateStream =
+                                    new DeflateStream(deflatedMemoryStream, CompressionMode.Compress))
+                                {
                                     deflateStream.Write(sourceBuffer, 0, sourceBuffer.Length);
-                            }
+                                }
 
                             var deflatedBytes = deflatedMemoryStream.ToArray();
 
                             // Blocks that are over 65536 bytes and the last block of each file are uncompressed
-                            if (deflatedBytes.Length >= 65536 || finalBlock)
+                            if (deflatedBytes.Length >= 0x10000 || finalBlock)
                             {
                                 // Replace deflated data with uncompressed data
                                 deflatedBytes = sourceBuffer;
-                                blockSizes[currentBlock] = deflatedBytes.Length == 65536
+                                blockSizes[currentBlock] = deflatedBytes.Length == 0x10000
                                     ? (ushort) 0
                                     : (ushort) sourceBufferSize;
                             }
@@ -162,12 +158,10 @@ namespace VBFTool
                             }
 
                             vbfWriter.Write(deflatedBytes); // write block to file
-
                             //File.WriteAllBytes("blocks\\block_" + currentBlock.ToString(), deflatedBytes);
                         }
 
-                        var currentProgress = (int) ((float) currentBlock/blockCount*100) + 1;
-
+                        var currentProgress = (int) ((float) currentBlock / blockCount * 100) + 1;
                         if (currentProgress != progress)
                         {
                             progress = currentProgress;
@@ -177,7 +171,6 @@ namespace VBFTool
 
                         currentBlock++;
                     }
-                    
                 }
 
                 // Write block size table to file
@@ -188,10 +181,10 @@ namespace VBFTool
 
                 // Write file block info
                 vbfWriter.Seek((int) posBlockInfo, SeekOrigin.Begin);
-                for (var f = 0; f < vbfFiles.Count; f++)
+                for (var f = 0; f < vbfFiles.Length; f++)
                 {
                     vbfWriter.Write(fileBlockListStarts[f]);
-                    vbfWriter.Write((uint) 4002806);
+                    vbfWriter.Write((uint) 0x3D13F6);
                     vbfWriter.Write(fileOriginalSizes[f]);
                     vbfWriter.Write(fileStartOffsets[f]);
                     vbfWriter.Write(fileNameOffset[f]);
@@ -205,7 +198,7 @@ namespace VBFTool
                 var buffer = new byte[vbfHeaderLength];
                 vbfStream.Read(buffer, 0, buffer.Length);
 
-                var fileHash = MD5.Create().ComputeHash(buffer);
+                var fileHash = Md5.ComputeHash(buffer);
                 vbfStream.Seek(0, SeekOrigin.End);
                 vbfStream.Write(fileHash, 0, fileHash.Length);
 
@@ -229,11 +222,10 @@ namespace VBFTool
         //    //}
         //}
 
-        private string FixFileName(string inputDirectory, string fileName)
+        private static string FixFileName(string inputDirectory, string fileName)
         {
             var innerFile = fileName.Substring(inputDirectory.Length + 1);
-            var fixedFile = innerFile.Replace('\\', '/');
-            return fixedFile;
+            return innerFile.Replace('\\', '/');
         }
     }
 }
