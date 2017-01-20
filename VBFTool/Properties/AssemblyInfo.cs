@@ -8,12 +8,12 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("VBFTool")]
 [assembly:
     AssemblyDescription(
-        "A command-line utility for extracting and rebuilding data files included with Final Fantasy X/X-2 HD Remaster")
+        "A utility for extracting (and rebuilding) data files included with Final Fantasy X/X-2 HD Remaster")
 ]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("VBFTool")]
-[assembly: AssemblyCopyright("Copyright © 2016")]
+[assembly: AssemblyCopyright("Copyright © 2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -32,14 +32,17 @@
         <GroupBox Header="Data" HorizontalAlignment="Left" Height="299" Margin="215,10,0,0" VerticalAlignment="Top"
                   Width="292">
             <Grid>
-                <Image x:Name="imageBox" HorizontalAlignment="Left" Height="132" Margin="10,10,-2,0"
-                       VerticalAlignment="Top" Width="272" Stretch="UniformToFill" />
+                <Image x:Name="imageBox" HorizontalAlignment="Left" Height="87" Margin="10,10,0,0"
+                       VerticalAlignment="Top" Width="260" Stretch="UniformToFill" />
 
                 <Button x:Name="openButton" Content="Open VBF" HorizontalAlignment="Left" Margin="50,223,0,0"
                         VerticalAlignment="Top" Width="75" Click="openButton_Click" />
                 <Button x:Name="exportButton" IsEnabled="False" Content="Export" HorizontalAlignment="Left"
                         Margin="167,223,0,0"
                         VerticalAlignment="Top" Width="75" Click="exportButton_Click" />
+
+                <MediaElement x:Name="previewMediaElement" HorizontalAlignment="Left" Height="100" Margin="10,102,0,0"
+                              VerticalAlignment="Top" Width="260" />
             </Grid>
         </GroupBox>
     </Grid>
